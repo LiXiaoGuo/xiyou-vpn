@@ -62,7 +62,7 @@ def save_current_title(new_login, old_login):
         if tmp:
             tmps.append(nl)
     current_title = min(tmps, key=lambda x: x['last_online_time_ago'])["title"]
-    print("\n已经保存当前的Title：",current_title)
+    print("\n已经保存当前的Title：", current_title)
     with open("/app/data/vpn_current_title", 'w+') as f:
         f.write(current_title)
 
@@ -91,22 +91,23 @@ def start_vpn(conf):
         total_output = ""
         key = ""
         while key == "":
-            output = os.read(master, 1000).decode('utf-8','ignore')
+            # 字节数尽可能大一点，避免字符串重中间截断了，导致下面的字符串匹配出问题
+            output = os.read(master, 8192).decode('utf-8', 'ignore')
             total_output += output
             print(output, end='')
-            #print("====================")
-            if isinstance(keywords,(list, tuple)):
-                #print(output.find(keywords[0]))
-                result = next(filter(lambda x: output.find(x) >= 0, keywords), None)
+            # print("====================")
+            if isinstance(keywords, (list, tuple)):
+                # print(output.find(keywords[0]))
+                result = next(filter(lambda x: re.search(x, total_output) is not None, keywords), None)
                 if result is not None:
                     key = result
-                    #print("key=",key)
+                    # print("key=",key)
                     break
             else:
-                #print(keywords,type(keywords))
-                if output.find(keywords) >= 0:
+                # print(keywords,type(keywords))
+                if re.search(keywords, total_output):
                     key = keywords
-                    #print("key=",key)
+                    # print("key=",key)
                     break
 
         return key, total_output
@@ -125,16 +126,15 @@ def start_vpn(conf):
     print("\n-- 正在输入密码")
 
     # 判断是成功了还是要输入用户组
-    key, op = wait_echo(["Group:", "Connected as"])
-    if key == "Group:":
+    key, op = wait_echo([r"Group: \[([^\]]+)]:", "Connected as"])
+    if key != "Connected as":
         goup = get_select_group(op, current_title)
         write(goup)
-        print("\n-- 正在输入用户组:",goup)
+        print("-- 正在输入用户组:", goup)
 
         # 等待连接成功
         wait_echo("SSL connected")
         print("\n—— VPN已连接")
-
 
     time.sleep(5)
     # 保存当前的title
@@ -142,7 +142,7 @@ def start_vpn(conf):
     save_current_title(new_login, old_login)
     try:
         # 等待程序退出
-        wait_echo(["exiting","server disconnect"])
+        wait_echo(["exiting", "server disconnect"])
         print("\n-- VPN连接已断开")
 
         os.close(master)
@@ -175,11 +175,10 @@ def get_select_group(output, last_title):
     # 提取匹配到的内容
     if result:
         matched_content = result.group(1)
-        print("匹配到的内容:")
-        print(matched_content)
+        print("\n匹配到的内容:", matched_content)
         return matched_content
     else:
-        print("未匹配到内容")
+        print("\n未匹配到内容")
         return "1"
 
 
